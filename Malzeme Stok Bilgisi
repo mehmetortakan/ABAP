@@ -1,0 +1,87 @@
+*&---------------------------------------------------------------------*
+*& Report  ZMM_MEHMET_MALZEME_RAPOR
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+
+REPORT zmm_mehmet_malzeme_rapor.
+
+PARAMETERS p_date TYPE gdatu_inv.
+
+TYPES : BEGIN OF gty_mchb,
+        matnr TYPE matnr,
+        werks TYPE werks_d,
+        lgort TYPE lgort_d,
+        charg TYPE charg_d,
+        clabs TYPE labst,
+        ukurs TYPE ukurs_curr,
+        ukurs_usd TYPE ukurs_curr,
+        ukurs_eur TYPE ukurs_curr,
+        END OF gty_mchb.
+
+DATA : gs_mchb TYPE gty_mchb,
+       gt_mchb TYPE TABLE OF gty_mchb.
+
+
+TYPES : BEGIN OF gty_mard,
+        matnr TYPE matnr,
+        werks TYPE werks_d,
+        lgort TYPE lgort_d,
+        charg TYPE charg_d,
+        labst TYPE labst,
+        ukurs TYPE ukurs_curr,
+        ukurs_usd TYPE ukurs_curr,
+        ukurs_eur TYPE ukurs_curr,
+        END OF gty_mard.
+
+DATA : gs_mard TYPE gty_mard,
+       gt_mard TYPE TABLE OF gty_mard.
+
+TYPES : BEGIN OF gty_tcurr,
+        kurst TYPE kurst_curr,
+        fcurr TYPE fcurr_curr,
+        tcurr TYPE tcurr_curr,
+        gdatu TYPE gdatu_inv,
+        ukurs TYPE ukurs_curr,
+        END OF gty_tcurr.
+
+DATA : gs_tcurr TYPE gty_tcurr,
+       gt_tcurr TYPE TABLE OF gty_tcurr.
+
+START-OF-SELECTION.
+
+  SELECT
+    matnr
+    werks
+    lgort
+    charg
+    clabs
+    FROM mchb INTO CORRESPONDING FIELDS OF TABLE gt_mchb
+    WHERE clabs NE 0.
+
+  SELECT
+  kurst
+  fcurr
+  tcurr
+  gdatu
+  ukurs
+    FROM tcurr INTO gs_tcurr
+    WHERE kurst EQ 'E' AND fcurr EQ 'USD' AND tcurr EQ 'TRY' AND gdatu EQ p_date .
+  ENDSELECT.
+
+*  READ TABLE gt_tcurr INTO gs_tcurr INDEX 1.
+
+
+
+
+  LOOP AT gt_mchb INTO gs_mchb.
+
+    gs_mchb-ukurs = gs_tcurr-ukurs.
+
+    MODIFY gt_mchb FROM gs_mchb.
+
+  ENDLOOP.
+
+  BREAK-POINT.
