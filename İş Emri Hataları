@@ -1,0 +1,289 @@
+*&---------------------------------------------------------------------*
+*& Report  ZZIM_TABLET_IE_HATALARI
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+
+REPORT ZZIM_TABLET_IE_HATALARI.
+
+TABLES objk.
+
+PARAMETERS: p_serge TYPE equi-serge OBLIGATORY.
+
+TYPES: BEGIN OF gty_equi,
+      equnr     TYPE equnr,
+      b_werk    TYPE werks_d,
+      b_lager   TYPE lgort_d,
+      b_charge  TYPE b_charge,
+      sobkz     TYPE sobkz,
+      kunnr     TYPE b_kunnr,
+      serge     TYPE serge,
+      herst     TYPE herst,
+      END OF gty_equi.
+
+DATA: gt_equi TYPE TABLE OF gty_equi,
+      gs_equi TYPE  gty_equi.
+
+
+START-OF-SELECTION.
+
+  SELECT * FROM equi AS u
+           INNER JOIN eqbs AS b ON u~equnr EQ b~equnr
+           INTO CORRESPONDING FIELDS OF TABLE gt_equi
+           WHERE u~serge EQ p_serge.
+
+    IF SY-SUBRC <> 0.
+      MESSAGE 'Girilen Seri Mevcut Değildir.' TYPE 'E'.
+    ENDIF.
+
+  READ TABLE gt_equi INTO gs_equi INDEX 1.
+
+*  WRITE:/ 'Ekipman = ', gs_equi-equnr.
+  DATA: maxobknr TYPE objknr.
+  SELECT MAX( obknr )
+         FROM objk
+         INTO maxobknr
+         WHERE equnr = gs_equi-equnr.
+
+*  WRITE:/ 'Serinin Son Nesne Listesi Değeri = ', maxobknr.
+
+  TYPES: BEGIN OF gty_ser03,
+        obknr     TYPE objknr,
+        bwart     TYPE bwart,
+        mblnr     TYPE mblnr,
+        mjahr     TYPE mjahr,
+        zeile     TYPE mblpo,
+        datum     TYPE datum,
+        kunde     TYPE kunnr,
+        werk      TYPE werks_d,
+        lagerort  TYPE lgort_d,
+        charge    TYPE charg_d,
+        END OF gty_ser03.
+
+  DATA: gt_ser03 TYPE TABLE OF gty_ser03,
+        gs_ser03 TYPE  gty_ser03.
+
+  SELECT * FROM ser03 INTO CORRESPONDING FIELDS OF TABLE gt_ser03
+    WHERE obknr EQ maxobknr.
+
+  READ TABLE gt_ser03 INTO gs_ser03 INDEX 1.
+
+*  WRITE:/ 'Serinin Son İşlem Türü = ', gs_ser03-bwart.
+*  WRITE:/ 'Son İşlem Tarihi = ', gs_ser03-datum.
+*  WRITE:/ 'Malzeme Belgesi = ', gs_ser03-mblnr.
+*  WRITE:/ 'Belge Kalemi = ', gs_ser03-zeile.
+
+  IF  gs_ser03-bwart NE '961'.
+    DATA :l_int TYPE i.
+    DATA :l_int_snc TYPE i.
+    l_int = 1.
+
+    MOVE gs_ser03-zeile TO l_int_snc.
+
+    l_int_snc = l_int_snc - l_int.
+
+    MOVE l_int_snc TO gs_ser03-zeile.
+  ENDIF.
+
+
+  TYPES: BEGIN OF gty_mseg,
+     mblnr            TYPE mblnr,
+     mjahr            TYPE mjahr,
+     matnr            TYPE matnr,
+     zeile            TYPE mblpo,
+     sgtxt            TYPE sgtxt,
+     zz_zim_durum     TYPE zzim_durum,
+     zz_ilce_depo     TYPE lgort_d,
+     END OF gty_mseg.
+
+  DATA: gt_mseg TYPE TABLE OF gty_mseg,
+        gs_mseg TYPE  gty_mseg.
+
+  SELECT * FROM mseg INTO CORRESPONDING FIELDS OF TABLE gt_mseg
+  WHERE mblnr EQ gs_ser03-mblnr AND mjahr EQ gs_ser03-mjahr AND zeile EQ gs_ser03-zeile.
+
+  READ TABLE gt_mseg INTO gs_mseg INDEX 1.
+
+*  WRITE:/ 'İş Emri Numarası = ', gs_mseg-sgtxt.
+*  WRITE:/ 'Depo Onayı = ', gs_mseg-zz_ilce_depo.
+
+  TYPES: BEGIN OF gty_zzim_t009,
+      mblnr    TYPE mblnr,
+      mjahr    TYPE mjahr,
+      zeile    TYPE mblpo,
+      wo_no    TYPE z_wo_no,
+      zislem   TYPE zzim_islem,
+      statu    TYPE char1,
+      END OF gty_zzim_t009.
+
+  DATA: gt_zzim_t009 TYPE TABLE OF gty_zzim_t009,
+        gs_zzim_t009 TYPE  gty_zzim_t009.
+
+  SELECT * FROM zzim_t009 INTO CORRESPONDING FIELDS OF TABLE gt_zzim_t009
+  WHERE mblnr EQ gs_ser03-mblnr AND mjahr EQ gs_ser03-mjahr AND zeile EQ gs_ser03-zeile.
+
+  READ TABLE gt_zzim_t009 INTO gs_zzim_t009 INDEX 1.
+
+  TYPES: BEGIN OF gty_zzim_t001,
+        uname      TYPE uname,
+        werks      TYPE werks_d,
+        lgort      TYPE lgort_d,
+        onayci2    TYPE uname,
+        onayci3    TYPE uname,
+        onayci4    TYPE uname,
+        END OF gty_zzim_t001.
+
+  DATA: gt_zzim_t001 TYPE TABLE OF gty_zzim_t001,
+        gs_zzim_t001 TYPE  gty_zzim_t001.
+
+  SELECT * FROM zzim_t001 INTO CORRESPONDING FIELDS OF TABLE gt_zzim_t001
+  WHERE lgort EQ gs_mseg-zz_ilce_depo .
+
+  READ TABLE gt_zzim_t001 INTO gs_zzim_t001 INDEX 1.
+
+  TYPES: BEGIN OF gty_usr21,
+      bname         TYPE xubname,
+      persnumber    TYPE ad_persnum,
+      name_text     TYPE ad_namtext,
+      smtp_srch     TYPE ad_smtpad2,
+      smtp_addr     TYPE ad_smtpadr,
+      END OF gty_usr21.
+
+  DATA: gt_usr21 TYPE TABLE OF gty_usr21,
+    gs_usr21 TYPE  gty_usr21.
+
+
+  IF gs_mseg-zz_zim_durum EQ '10' AND gs_equi-b_lager EQ '9999' AND gs_ser03-bwart EQ '632'.
+    IF gs_zzim_t009-statu IS INITIAL .
+
+      CASE gs_zzim_t009-zislem.
+        WHEN 13.
+
+          SELECT * FROM usr21 AS u21
+                   LEFT JOIN adrp AS a ON u21~persnumber EQ a~persnumber
+                   LEFT JOIN adr6 AS a6 ON u21~persnumber EQ a6~persnumber
+                   INTO CORRESPONDING FIELDS OF TABLE gt_usr21
+          WHERE u21~bname EQ gs_zzim_t001-onayci2.
+
+          READ TABLE gt_usr21 INTO gs_usr21 INDEX 1.
+          WRITE : / 'İlgili Serinin Kullanım Onayları Tamamlanmadığından Dolayı İş Emrini Kapatamamaktasınız.'.
+          SKIP  1.
+          WRITE : / 'İş Emri 2. Onaylayıcıda Beklemektedir.'.
+          WRITE : / 'Onay Bekleyen İş Emri Numarası ',gs_mseg-sgtxt.
+          WRITE : / 'Onaylayıcı Kullanıcı Adı = ', gs_zzim_t001-onayci2.
+          WRITE : / 'Onaylayıcı Adı Soyadı = ', gs_usr21-name_text.
+          SKIP  1.
+          WRITE : / 'Aşağıdaki Mail Adresi Üzerinden Onaylayıcı İle İletişime Geçebilirsiniz'.
+          WRITE : / gs_usr21-smtp_addr.
+
+        WHEN 14.
+
+          SELECT * FROM usr21 AS u21
+                   LEFT JOIN adrp AS a ON u21~persnumber EQ a~persnumber
+                   LEFT JOIN adr6 AS a6 ON u21~persnumber EQ a6~persnumber
+                   INTO CORRESPONDING FIELDS OF TABLE gt_usr21
+          WHERE u21~bname EQ gs_zzim_t001-onayci3.
+
+          READ TABLE gt_usr21 INTO gs_usr21 INDEX 1.
+          WRITE : / 'İlgili Serinin Kullanım Onayları Tamamlanmadığından Dolayı İş Emrini Kapatamamaktasınız.'.
+          SKIP  1.
+          WRITE : / 'İş Emri 3. Onaylayıcıda Beklemektedir.'.
+          WRITE : / 'Onay Bekleyen İş Emri Numarası ',gs_mseg-sgtxt.
+          WRITE : / 'Onaylayıcı Kullanıcı Adı = ', gs_zzim_t001-onayci3.
+          WRITE : / 'Onaylayıcı Adı Soyadı = ', gs_usr21-name_text.
+          SKIP  1.
+          WRITE : / 'Aşağıdaki Mail Adresi Üzerinden Onaylayıcı İle İletişime Geçebilirsiniz'.
+          WRITE : / gs_usr21-smtp_addr.
+        WHEN 15.
+
+          SELECT * FROM usr21 AS u21
+                   LEFT JOIN adrp AS a ON u21~persnumber EQ a~persnumber
+                   LEFT JOIN adr6 AS a6 ON u21~persnumber EQ a6~persnumber
+                   INTO CORRESPONDING FIELDS OF TABLE gt_usr21
+          WHERE u21~bname EQ gs_zzim_t001-onayci4.
+
+          READ TABLE gt_usr21 INTO gs_usr21 INDEX 1.
+          WRITE : / 'İlgili Serinin Kullanım Onayları Tamamlanmadığından Dolayı İş Emrini Kapatamamaktasınız.'.
+          SKIP  1.
+          WRITE : / 'İş Emri Tesis Onaylayıcısında Beklemektedir.'.
+          WRITE : / 'Onay Bekleyen İş Emri Numarası ',gs_mseg-sgtxt.
+          WRITE : / 'Onaylayıcı Kullanıcı Adı = ', gs_zzim_t001-onayci4.
+          WRITE : / 'Onaylayıcı Adı Soyadı = ', gs_usr21-name_text.
+          SKIP  1.
+          WRITE : / 'Aşağıdaki Mail Adresi Üzerinden Onaylayıcı İle İletişime Geçebilirsiniz'.
+          WRITE : / gs_usr21-smtp_addr.
+
+      ENDCASE.
+
+    ELSE.
+
+      WRITE : / 'Onaylar Tamamlanmıştır.'.
+
+    ENDIF.
+  ELSEIF gs_mseg-zz_zim_durum IS INITIAL AND gs_equi-b_lager EQ '9999' AND gs_ser03-bwart EQ '632'.
+
+    WRITE : / 'İlgili Serinin Kullanım Onayları Tamamlanmadığından Dolayı İş Emrini Kapatamamaktasınız.'.
+    WRITE : / 'Onay Bekleyen İş Emri Numarası ',gs_mseg-sgtxt.
+    WRITE : / 'Şuanda ',gs_mseg-zz_ilce_depo,' Nolu Depo Onayında(1. Onay) Beklemektedir.'.
+
+  ELSEIF gs_mseg-zz_zim_durum IS INITIAL AND gs_equi-b_lager EQ '9999' AND gs_ser03-bwart EQ '961'.
+
+    TYPES: BEGIN OF gty_m_debia,
+           mcod1     TYPE mcdd1,
+           kunnr     TYPE kunnr,
+           END OF gty_m_debia.
+
+    DATA: gt_m_debia TYPE TABLE OF gty_m_debia,
+          gs_m_debia TYPE  gty_m_debia.
+
+    SELECT * FROM m_debia INTO CORRESPONDING FIELDS OF TABLE gt_m_debia
+    WHERE kunnr EQ gs_ser03-kunde.
+
+    READ TABLE gt_m_debia INTO gs_m_debia INDEX 1.
+    DATA :ekip TYPE c LENGTH 9.
+    MOVE gs_m_debia-mcod1 TO ekip.
+    WRITE : / 'İlgili Seri ',gs_ser03-datum, 'Tarihinde ',ekip,'Kodlu Ekip Tarafından Sökümü Yapılmıştır.'.
+    WRITE : / 'Eğer Bu Söküm İşlemi Hatalı İse Belirtilen İş Emri Reddedilmelidir. Red Sonrası İş Emrini Kapatabilirsiniz'.
+    WRITE : / 'Malzeme Kodu = ',gs_mseg-matnr.
+    WRITE : / 'Depo Yeri = ',gs_mseg-zz_ilce_depo.
+    WRITE : / 'İş Emri No = ',gs_mseg-sgtxt.
+
+
+  ENDIF.
+
+
+  IF gs_equi-b_werk IS NOT INITIAL AND gs_equi-b_lager IS INITIAL AND gs_equi-sobkz EQ 'W'.
+
+    SELECT * FROM m_debia INTO CORRESPONDING FIELDS OF TABLE gt_m_debia
+    WHERE kunnr EQ gs_equi-kunnr.
+
+    READ TABLE gt_m_debia INTO gs_m_debia INDEX 1.
+
+    DATA :ekip2 TYPE c LENGTH 9.
+    MOVE gs_m_debia-mcod1 TO ekip2.
+
+    WRITE : / 'İlgili Seri',ekip2,'Kodlu Ekibe Zimmetlidir. '.
+    SKIP  1.
+    WRITE : / 'İş Emrini Kaptmak İsteyen Ekip,',ekip2,'Kodlu Ekip İse, Seri İş Emrine Bir den Fazla Ekleniyor Olabilir'.
+    WRITE 'İş Emri Listesi Yenilenip Tekrar Denenmeli.'.
+    SKIP  1.
+    WRITE : / 'İş Emrini Kaptmak İsteyen Ekip,',ekip2,'Kodlu Ekip Değil İse, Seri',ekip2,'Ekibinden Zimmet İade Alınıp'.
+    WRITE 'İşlemi Yapacak Olan Ekibe Zimmetlenmelidir.'.
+    SKIP  1.
+    WRITE : / 'İlgili Seri Söküme Ekleniyor İse',ekip2,'Kodlu Ekişten Zimmet İade Alınıp Rezervasyon İle Sistem den Düşümü Yapılmalı'.
+    WRITE 'Düşüm Sonrası İş Emrini Kapatabilirsiniz.'.
+
+
+
+  ELSEIF gs_equi-b_werk IS NOT INITIAL AND gs_equi-b_lager IS NOT INITIAL AND gs_equi-b_lager NE '9999'.
+
+     WRITE : / 'İlgili Seri',gs_equi-b_lager,'Depo Yerinde Mevcut.'.
+     SKIP  1.
+     WRITE : / 'Eğer Seri Kullanılanlara Eklenmek İsteniyor ise İşlemi Yapacak Olan Ekibe Zimmetlenmelidir.'.
+     WRITE : / 'Eğer Seri Sökülenlere Eklenmek İsteniliyor ise ',gs_equi-b_lager,'Depo Yerinden Rezervasyon İle Çıkışı Yapılması Gerekmektedir.'.
+     SKIP  1.
+     WRITE : / 'Yukarıdaki Uygun Olan İşlemler Sonrasında İş Emrini Kapatabilirsiniz.'.
+
+  ENDIF.
