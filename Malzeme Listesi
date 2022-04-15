@@ -1,0 +1,151 @@
+*&---------------------------------------------------------------------*
+*& Report  ZMM_MEHMET_SALV_TEST
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+
+REPORT zmm_mehmet_salv_test.
+
+TABLES mara.
+TABLES t023.
+
+INITIALIZATION.
+
+  SELECT-OPTIONS : s_matnr FOR mara-matnr,
+                   s_matkl FOR mara-matkl,
+                   s_mtart FOR mara-mtart,
+                   s_begru FOR t023-begru.
+
+  PARAMETERS p_lvorm AS CHECKBOX DEFAULT 'X'.
+
+  TYPES: BEGIN OF gty_mara,
+         matnr TYPE matnr,
+         maktx TYPE maktx,
+         meins TYPE meins,
+         mtart TYPE mtart,
+         mbrsh TYPE mbrsh,
+         mbbez TYPE mbbez,
+         begru TYPE begru,
+         matkl TYPE matkl,
+         wgbez TYPE wgbez,
+         ersda TYPE ersda,
+         ernam TYPE ernam,
+         laeda TYPE laeda,
+         aenam TYPE aenam,
+         lvorm TYPE lvorm,
+         END OF gty_mara.
+
+  DATA: gt_mara TYPE TABLE OF gty_mara.
+
+
+
+
+START-OF-SELECTION.
+
+  IF p_lvorm IS NOT INITIAL .
+
+
+    IF s_begru IS INITIAL .
+
+
+      SELECT *  FROM mara AS mr
+                LEFT JOIN makt AS mk ON mr~matnr EQ mk~matnr
+                LEFT JOIN t023t AS mtn ON mtn~matkl EQ mr~matkl
+                LEFT JOIN t023 AS my ON my~matkl EQ mr~matkl
+                INNER JOIN t137t AS ms ON ms~mbrsh EQ mr~mbrsh
+        INTO CORRESPONDING FIELDS OF TABLE gt_mara
+        WHERE mr~matnr IN s_matnr AND mr~matkl IN s_matkl AND mr~mtart IN s_mtart AND ms~spras EQ 'TR'.
+
+    ELSE.
+
+      SELECT *  FROM mara AS mr
+              LEFT JOIN makt AS mk ON mr~matnr EQ mk~matnr
+              LEFT JOIN t023t AS mtn ON mtn~matkl EQ mr~matkl
+              INNER  JOIN t023 AS my ON my~matkl EQ mr~matkl
+              INNER JOIN t137t AS ms ON ms~mbrsh EQ mr~mbrsh
+      INTO CORRESPONDING FIELDS OF TABLE gt_mara
+      WHERE mr~matnr IN s_matnr AND mr~matkl IN s_matkl AND mr~mtart IN s_mtart AND my~begru IN s_begru AND ms~spras EQ 'TR'.
+    ENDIF.
+
+  ELSE.
+    IF s_begru IS INITIAL .
+
+
+      SELECT *  FROM mara AS mr
+                LEFT JOIN makt AS mk ON mr~matnr EQ mk~matnr
+                LEFT JOIN t023t AS mtn ON mtn~matkl EQ mr~matkl
+                LEFT JOIN t023 AS my ON my~matkl EQ mr~matkl
+                INNER JOIN t137t AS ms ON ms~mbrsh EQ mr~mbrsh
+        INTO CORRESPONDING FIELDS OF TABLE gt_mara
+        WHERE mr~matnr IN s_matnr AND mr~matkl IN s_matkl AND mr~mtart IN s_mtart AND mr~lvorm NE 'X' AND ms~spras EQ 'TR'.
+
+    ELSE.
+
+      SELECT *  FROM mara AS mr
+              LEFT JOIN makt AS mk ON mr~matnr EQ mk~matnr
+              LEFT JOIN t023t AS mtn ON mtn~matkl EQ mr~matkl
+              INNER  JOIN t023 AS my ON my~matkl EQ mr~matkl
+              INNER JOIN t137t AS ms ON ms~mbrsh EQ mr~mbrsh
+      INTO CORRESPONDING FIELDS OF TABLE gt_mara
+      WHERE mr~matnr IN s_matnr AND mr~matkl IN s_matkl AND mr~mtart IN s_mtart AND my~begru IN s_begru AND mr~lvorm NE 'X' AND ms~spras EQ 'TR'.
+    ENDIF.
+
+
+  ENDIF.
+
+DATA: go_salv TYPE REF TO cl_salv_table.
+
+  cl_salv_table=>factory(
+
+    IMPORTING
+      r_salv_table   =   go_salv
+
+    CHANGING
+      t_table        = gt_mara
+  ).
+
+****************************GÖRÜNTÜ ÖZELLİKLERİ**************************************
+
+  DATA: lo_display TYPE REF TO cl_salv_display_settings.
+
+  lo_display = go_salv->get_display_settings( ).
+
+  lo_display->set_list_header( value ='SALV ÇALIŞMALARI'  ).
+  lo_display->set_striped_pattern( value ='X'  ).
+
+*************************************************************************************
+
+***************************ARAÇ BUTONLARI EKLEME*************************************
+
+  DATA: lo_func TYPE REF TO cl_salv_functions.
+
+  lo_func = go_salv->get_functions( ).
+  lo_func->set_all( ).
+
+*************************************************************************************
+
+**************************SUTUN BÜYÜKŞÜĞÜNÜ OPTİMİZE ETME****************************
+
+  DATA: lo_columns TYPE REF TO cl_salv_columns.
+  lo_columns = go_salv->get_columns( ).
+  lo_columns->set_optimize( ).
+
+*************************************************************************************
+
+***********************LAYOUT EKLEME*************************************************
+
+  DATA layout_settings TYPE REF TO cl_salv_layout.
+  DATA layout_key      TYPE salv_s_layout_key.
+
+  layout_settings = go_salv->get_layout( ).
+
+  layout_key-report = sy-repid.
+  layout_settings->set_key( layout_key ).
+
+  layout_settings->set_save_restriction( if_salv_c_layout=>restrict_none ).
+
+*************************************************************************************
+
+  go_salv->display( ).
